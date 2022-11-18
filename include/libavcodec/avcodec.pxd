@@ -231,6 +231,13 @@ cdef extern from "libavcodec/avcodec.h" nogil:
         int get_buffer(AVCodecContext *ctx, AVFrame *frame)
         void release_buffer(AVCodecContext *ctx, AVFrame *frame)
 
+
+         # Hardware acceleration
+        AVHWAccel *hwaccel
+        AVBufferRef *hw_device_ctx
+        AVBufferRef *hw_frames_ctx
+        AVPixelFormat (*get_format)(AVCodecContext *s, const AVPixelFormat * fmt)
+
         # User Data
         void *opaque
 
@@ -238,6 +245,21 @@ cdef extern from "libavcodec/avcodec.h" nogil:
     cdef void avcodec_free_context(AVCodecContext **ctx)
 
     cdef AVClass* avcodec_get_class()
+
+
+    # Hardware acceleration
+    cdef enum:
+        AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX = 0x01,
+        AV_CODEC_HW_CONFIG_METHOD_HW_FRAMES_CTX = 0x02,
+        AV_CODEC_HW_CONFIG_METHOD_INTERNAL      = 0x04,
+        AV_CODEC_HW_CONFIG_METHOD_AD_HOC        = 0x08,
+
+    cdef struct AVCodecHWConfig:
+        AVPixelFormat pix_fmt;
+        int methods;
+        AVHWDeviceType device_type;
+
+    cdef const AVCodecHWConfig* avcodec_get_hw_config(const AVCodec *codec, int index)
 
     cdef struct AVCodecDescriptor:
         AVCodecID id

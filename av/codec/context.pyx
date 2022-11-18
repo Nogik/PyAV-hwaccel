@@ -7,6 +7,7 @@ cimport libav as lib
 
 from av.bytesource cimport ByteSource, bytesource
 from av.codec.codec cimport Codec, wrap_codec
+from av.codec.hwaccel cimport HWAccel
 from av.dictionary cimport _Dictionary
 from av.enum cimport define_enum
 from av.error cimport err_check
@@ -20,7 +21,7 @@ from av.dictionary import Dictionary
 cdef object _cinit_sentinel = object()
 
 
-cdef CodecContext wrap_codec_context(lib.AVCodecContext *c_ctx, const lib.AVCodec *c_codec):
+cdef CodecContext wrap_codec_context(lib.AVCodecContext *c_ctx, const lib.AVCodec *c_codec, HWAccel hwaccel):
     """Build an av.CodecContext for an existing AVCodecContext."""
 
     cdef CodecContext py_ctx
@@ -28,7 +29,7 @@ cdef CodecContext wrap_codec_context(lib.AVCodecContext *c_ctx, const lib.AVCode
     # TODO: This.
     if c_ctx.codec_type == lib.AVMEDIA_TYPE_VIDEO:
         from av.video.codeccontext import VideoCodecContext
-        py_ctx = VideoCodecContext(_cinit_sentinel)
+        py_ctx = VideoCodecContext(_cinit_sentinel, hwaccel = hwaccel)
     elif c_ctx.codec_type == lib.AVMEDIA_TYPE_AUDIO:
         from av.audio.codeccontext import AudioCodecContext
         py_ctx = AudioCodecContext(_cinit_sentinel)
@@ -38,7 +39,7 @@ cdef CodecContext wrap_codec_context(lib.AVCodecContext *c_ctx, const lib.AVCode
     else:
         py_ctx = CodecContext(_cinit_sentinel)
 
-    py_ctx._init(c_ctx, c_codec)
+    py_ctx._init(c_ctx, c_codec,hwaccel)
 
     return py_ctx
 
@@ -143,10 +144,10 @@ Flags2 = define_enum('Flags2', __name__, (
 cdef class CodecContext(object):
 
     @staticmethod
-    def create(codec, mode=None):
+    def create(codec, mode=None, hwaccel=None):
         cdef Codec cy_codec = codec if isinstance(codec, Codec) else Codec(codec, mode)
         cdef lib.AVCodecContext *c_ctx = lib.avcodec_alloc_context3(cy_codec.ptr)
-        return wrap_codec_context(c_ctx, cy_codec.ptr)
+        return wrap_codec_context(c_ctx, cy_codec.ptr, hwaccel)
 
     def __cinit__(self, sentinel=None, *args, **kwargs):
         if sentinel is not _cinit_sentinel:
@@ -155,7 +156,7 @@ cdef class CodecContext(object):
         self.options = {}
         self.stream_index = -1  # This is set by the container immediately.
 
-    cdef _init(self, lib.AVCodecContext *ptr, const lib.AVCodec *codec):
+    cdef _init(self, lib.AVCodecContext *ptr, const lib.AVCodec *codec, HWAccel hwaccel):
 
         self.ptr = ptr
         if self.ptr.codec and codec and self.ptr.codec != codec:
@@ -287,6 +288,8 @@ cdef class CodecContext(object):
         # Assert we have a time_base for encoders.
         if not self.ptr.time_base.num and self.is_encoder:
             self._set_default_time_base()
+        
+        self.set_hw()
 
         err_check(lib.avcodec_open2(self.ptr, self.codec.ptr, &options.ptr))
 
@@ -402,15 +405,17 @@ cdef class CodecContext(object):
     cdef _send_frame_and_recv(self, Frame frame):
 
         cdef Packet packet
-
         cdef int res
+
         with nogil:
             res = lib.avcodec_send_frame(self.ptr, frame.ptr if frame is not None else NULL)
+
         err_check(res)
 
         out = []
         while True:
-            packet = self._recv_packet()
+            #TO DO
+            packet = self._recv_packet(frame.ptr.pts)
             if packet:
                 out.append(packet)
             else:
@@ -454,12 +459,22 @@ cdef class CodecContext(object):
         if res == -EAGAIN or res == lib.AVERROR_EOF:
             return
         err_check(res)
+        print(frame.ptr.format)
+
+        frame = self._transfer_hwframe(frame)
 
         if not res:
             self._next_frame = None
             return frame
 
-    cdef _recv_packet(self):
+    cdef _transfer_hwframe(self, Frame frame):
+        print ("Tady")
+        return frame
+
+    cdef set_hw(self):
+        return 0
+
+    cdef _recv_packet(self, pts):
 
         cdef Packet packet = Packet()
 
@@ -470,6 +485,9 @@ cdef class CodecContext(object):
             return
         err_check(res)
 
+        #TO DOs
+        #print('Packet PTS: ',packet.ptr.pts ,packet.ptr.dts)
+        #packet.ptr.pts = pts
         if not res:
             return packet
 

@@ -1,6 +1,7 @@
 cimport libav as lib
 
 from av.container.pyio cimport PyIOFile
+from av.codec.hwaccel cimport HWAccel
 from av.container.streams cimport StreamContainer
 from av.dictionary cimport _Dictionary
 from av.format cimport ContainerFormat
@@ -33,6 +34,8 @@ cdef class Container(object):
     cdef readonly dict options
     cdef readonly dict container_options
     cdef readonly list stream_options
+
+    cdef HWAccel hwaccel
 
     cdef readonly StreamContainer streams
     cdef readonly dict metadata

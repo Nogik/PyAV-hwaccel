@@ -26,6 +26,8 @@ arg_parser.add_argument('-a', '--audio', action='store_true')
 arg_parser.add_argument('-v', '--video', action='store_true')
 arg_parser.add_argument('-s', '--subs', action='store_true')
 arg_parser.add_argument('-d', '--data', action='store_true')
+arg_parser.add_argument('-H', '--hwaccel', action='store_true')
+
 arg_parser.add_argument('--dump-packets', action='store_true')
 arg_parser.add_argument('--dump-planes', action='store_true')
 arg_parser.add_argument('-p', '--play', action='store_true')

@@ -1,4 +1,5 @@
 from av.audio.format cimport get_audio_format
+from av.codec.hwaccel cimport wrap_hwconfig
 from av.descriptor cimport wrap_avclass
 from av.enum cimport define_enum
 from av.utils cimport avrational_to_fraction, flag_in_bitfield
@@ -203,10 +204,18 @@ cdef class Codec(object):
         if self.is_encoder and lib.av_codec_is_decoder(self.ptr):
             raise RuntimeError('%s is both encoder and decoder.')
 
-    def create(self):
+    def __repr__(self):
+        return f'<av.{self.__class__.__name__}({self.name!r}, {self.mode!r})>'
+
+    def create(self, *args, **kwargs):
         """Create a :class:`.CodecContext` for this codec."""
         from .context import CodecContext
-        return CodecContext.create(self)
+        return CodecContext.create(self, *args, **kwargs)
+
+    @property
+    def mode(self):
+        return 'w' if self.is_encoder else 'r'
+
 
     property is_decoder:
         def __get__(self):
@@ -283,6 +292,26 @@ cdef class Codec(object):
         while self.ptr.sample_fmts[i] != -1:
             ret.append(get_audio_format(self.ptr.sample_fmts[i]))
             i += 1
+        return ret
+
+    @property
+    def hardware_configs(self):
+
+        if self._hardware_configs:
+            return self._hardware_configs
+
+        ret = []
+        cdef int i = 0
+        cdef lib.AVCodecHWConfig *ptr
+        while True:
+            ptr = lib.avcodec_get_hw_config(self.ptr, i)
+            if not ptr:
+                break
+            ret.append(wrap_hwconfig(ptr))
+            i += 1
+
+        ret = tuple(ret)
+        self._hardware_configs = ret
         return ret
 
     # NOTE: there are some overlaps, which we defer to how `ffmpeg -codecs`
@@ -385,8 +414,28 @@ def dump_codecs():
                 '.I'[codec.intra_only],
                 '.L'[codec.lossy],
                 '.S'[codec.lossless],
+                '.H'[bool((d_codec or codec).hardware_configs)],
                 codec.name,
                 codec.long_name
             )
         except Exception as e:
             print '...... %-18s ERROR: %s' % (codec.name, e)
+
+def dump_hwconfigs():
+
+    print('Hardware configs:')
+
+    for name in sorted(codecs_available):
+
+        try:
+            codec = Codec(name, 'r')
+        except ValueError:
+            continue
+
+        configs = codec.hardware_configs
+        if not configs:
+            continue
+
+        print('   ', codec.name)
+        for config in configs:
+            print('       ', config)

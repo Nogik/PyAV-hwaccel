@@ -174,7 +174,7 @@ cdef class Container(object):
                   container_options, stream_options,
                   metadata_encoding, metadata_errors,
                   buffer_size, open_timeout, read_timeout,
-                  io_open):
+                  io_open, hwaccel):
 
         if sentinel is not _cinit_sentinel:
             raise RuntimeError('cannot construct base Container')
@@ -197,6 +197,9 @@ cdef class Container(object):
 
         self.open_timeout = open_timeout
         self.read_timeout = read_timeout
+
+        self.hwaccel = hwaccel
+
 
         self.buffer_size = buffer_size
         self.io_open = io_open
@@ -338,7 +341,7 @@ cdef class Container(object):
 def open(file, mode=None, format=None, options=None,
          container_options=None, stream_options=None,
          metadata_encoding='utf-8', metadata_errors='strict',
-         buffer_size=32768, timeout=None, io_open=None):
+         buffer_size=32768, timeout=None, io_open=None,  hwaccel=None):
     """open(file, mode='r', **kwargs)
 
     Main entrypoint to opening files/streams.
@@ -397,13 +400,16 @@ def open(file, mode=None, format=None, options=None,
         open_timeout = timeout
         read_timeout = timeout
 
+    if hwaccel is not None:
+        hwaccel = HWAccel.adapt(hwaccel)
+
     if mode.startswith('r'):
         return InputContainer(
             _cinit_sentinel, file, format, options,
             container_options, stream_options,
             metadata_encoding, metadata_errors,
             buffer_size, open_timeout, read_timeout,
-            io_open
+            io_open, hwaccel
         )
     if mode.startswith('w'):
         if stream_options:
@@ -413,6 +419,6 @@ def open(file, mode=None, format=None, options=None,
             container_options, stream_options,
             metadata_encoding, metadata_errors,
             buffer_size, open_timeout, read_timeout,
-            io_open
+            io_open, hwaccel
         )
     raise ValueError("mode must be 'r' or 'w'; got %r" % mode)

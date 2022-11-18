@@ -3,6 +3,7 @@ cimport libav as lib
 
 from av.bytesource cimport ByteSource
 from av.codec.codec cimport Codec
+from av.codec.hwaccel cimport HWAccel, HWAccelContext
 from av.frame cimport Frame
 from av.packet cimport Packet
 
@@ -21,9 +22,19 @@ cdef class CodecContext(object):
 
     cdef lib.AVCodecParserContext *parser
 
-    cdef _init(self, lib.AVCodecContext *ptr, const lib.AVCodec *codec)
+    #TO DO - Move to other class
+    cdef lib.AVBufferRef *hw_frames_ref
+    cdef lib.AVHWFramesContext *frames_ctx_ptr;
+
+    cdef _init(self, lib.AVCodecContext *ptr, const lib.AVCodec *codec, HWAccel hwaccel)
 
     cdef readonly Codec codec
+
+    cdef readonly HWAccelContext hwaccel
+    
+    cdef set_hw(self)
+
+
 
     cdef public dict options
 
@@ -51,9 +62,11 @@ cdef class CodecContext(object):
     # send/recv buffer may be limited to a single frame. Ergo, we need to flush
     # the buffer as often as possible.
     cdef _send_frame_and_recv(self, Frame frame)
-    cdef _recv_packet(self)
+    cdef _recv_packet(self, pts)
     cdef _send_packet_and_recv(self, Packet packet)
     cdef _recv_frame(self)
+    cdef _transfer_hwframe(self, Frame frame)
+
 
     # Implemented by children for the generic send/recv API, so we have the
     # correct subclass of Frame.
@@ -61,4 +74,4 @@ cdef class CodecContext(object):
     cdef Frame _alloc_next_frame(self)
 
 
-cdef CodecContext wrap_codec_context(lib.AVCodecContext*, const lib.AVCodec*)
+cdef CodecContext wrap_codec_context(lib.AVCodecContext*, const lib.AVCodec*, HWAccel hwaccel)

@@ -27,6 +27,9 @@ cdef extern from "libavutil/avutil.h" nogil:
         AV_PIX_FMT_NONE
         AV_PIX_FMT_YUV420P
         AV_PIX_FMT_RGB24
+        AV_PIX_FMT_NV12
+        AV_PIX_FMT_VAAPI 
+        
         PIX_FMT_RGB24
         PIX_FMT_RGBA
 
